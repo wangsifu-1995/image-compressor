@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://image-compressor-85h.pages.dev/sitemap.xml
