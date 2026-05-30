@@ -1162,47 +1162,63 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
 
-                canvas.toBlob((blob) => {
-                    if (!blob) {
-                        showToast('⚠️ 压缩失败，请尝试其他格式');
-                        isCompressing = false;
-                        btnCompress.textContent = '🔄 重新压缩';
-                        btnCompress.disabled = false;
-                        return;
-                    }
+                // 智能压缩：从用户设定质量开始，逐步降低直到比原图小
+                const qualitySteps = [quality, 0.6, 0.5, 0.4, 0.3];
+                let stepIndex = 0;
 
-                    // 如果压缩后反而更大，直接用原始文件
-                    if (blob.size >= originalFile.size) {
-                        compressedBlob = originalFile;  // 保留原始数据
-                        compressedPreview.src = originalDataUrl;
-                        compressedSize.textContent = formatBytes(originalFile.size);
-                        compressedSizeDetail.textContent = formatBytes(originalFile.size);
-                        savedPercent.textContent = '已是最优';
-                        savedPercent.style.color = 'var(--success)';
-                        compressedDims.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
-                        showToast('💡 当前格式已是最优大小，无需压缩');
-                        isCompressing = false;
-                        btnCompress.textContent = '🔄 重新压缩';
-                        btnCompress.disabled = false;
-                        return;
-                    }
+                function tryCompress() {
+                    const currentQuality = qualitySteps[stepIndex];
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            showToast('⚠️ 压缩失败，请尝试其他格式');
+                            isCompressing = false;
+                            btnCompress.textContent = '🔄 重新压缩';
+                            btnCompress.disabled = false;
+                            return;
+                        }
 
-                    compressedBlob = blob;
-                    const url = URL.createObjectURL(blob);
-                    compressedPreview.src = url;
+                        // 如果比原图小，或者已经是最后一步，接受结果
+                        if (blob.size < originalFile.size || stepIndex >= qualitySteps.length - 1) {
+                            if (blob.size < originalFile.size) {
+                                // 压缩成功
+                                compressedBlob = blob;
+                                const url = URL.createObjectURL(blob);
+                                compressedPreview.src = url;
+                                compressedSize.textContent = formatBytes(blob.size);
+                                compressedSizeDetail.textContent = formatBytes(blob.size);
+                                const saved = ((1 - blob.size / originalFile.size) * 100).toFixed(1);
+                                savedPercent.textContent = saved + '%';
+                                savedPercent.style.color = 'var(--success)';
+                                compressedDims.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
+                                if (stepIndex > 0) {
+                                    showToast('💡 已自动降低质量至 ' + Math.round(currentQuality * 100) + '% 以实现压缩');
+                                    qualitySlider.value = Math.round(currentQuality * 100);
+                                    qualityValue.textContent = qualitySlider.value + '%';
+                                }
+                            } else {
+                                // 所有尝试都无法压缩，保留原图
+                                compressedBlob = originalFile;
+                                compressedPreview.src = originalDataUrl;
+                                compressedSize.textContent = formatBytes(originalFile.size);
+                                compressedSizeDetail.textContent = formatBytes(originalFile.size);
+                                savedPercent.textContent = '已是最优';
+                                savedPercent.style.color = 'var(--success)';
+                                compressedDims.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
+                                showToast('💡 当前图片已是最优大小，无法进一步压缩');
+                            }
+                            isCompressing = false;
+                            btnCompress.textContent = '🔄 重新压缩';
+                            btnCompress.disabled = false;
+                            return;
+                        }
 
-                    // 更新统计
-                    compressedSize.textContent = formatBytes(blob.size);
-                    compressedSizeDetail.textContent = formatBytes(blob.size);
-                    const saved = ((1 - blob.size / originalFile.size) * 100).toFixed(1);
-                    savedPercent.textContent = saved > 0 ? saved + '%' : '0%';
-                    savedPercent.style.color = 'var(--success)';
-                    compressedDims.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
+                        // 比原图大，尝试更低的下一步质量
+                        stepIndex++;
+                        tryCompress();
+                    }, format, currentQuality);
+                }
 
-                    isCompressing = false;
-                    btnCompress.textContent = '🔄 重新压缩';
-                    btnCompress.disabled = false;
-                }, format, quality);
+                tryCompress();
             };
             img.onerror = () => {
                 showToast('⚠️ 图片加载失败');
