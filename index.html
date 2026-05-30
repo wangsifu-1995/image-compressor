@@ -1171,9 +1171,20 @@
                         return;
                     }
 
-                    // 如果压缩后反而更大，用原图
-                    if (blob.size >= originalFile.size && quality >= 0.9) {
-                        blob = new Blob([originalFile], { type: format });
+                    // 如果压缩后反而更大，直接用原始文件
+                    if (blob.size >= originalFile.size) {
+                        compressedBlob = originalFile;  // 保留原始数据
+                        compressedPreview.src = originalDataUrl;
+                        compressedSize.textContent = formatBytes(originalFile.size);
+                        compressedSizeDetail.textContent = formatBytes(originalFile.size);
+                        savedPercent.textContent = '已是最优';
+                        savedPercent.style.color = 'var(--success)';
+                        compressedDims.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
+                        showToast('💡 当前格式已是最优大小，无需压缩');
+                        isCompressing = false;
+                        btnCompress.textContent = '🔄 重新压缩';
+                        btnCompress.disabled = false;
+                        return;
                     }
 
                     compressedBlob = blob;
@@ -1185,15 +1196,8 @@
                     compressedSizeDetail.textContent = formatBytes(blob.size);
                     const saved = ((1 - blob.size / originalFile.size) * 100).toFixed(1);
                     savedPercent.textContent = saved > 0 ? saved + '%' : '0%';
+                    savedPercent.style.color = 'var(--success)';
                     compressedDims.textContent = img.naturalWidth + ' × ' + img.naturalHeight;
-
-                    // 如果没节省空间，提示
-                    if (saved <= 0) {
-                        savedPercent.textContent = '无压缩空间';
-                        savedPercent.style.color = 'var(--text-secondary)';
-                    } else {
-                        savedPercent.style.color = 'var(--success)';
-                    }
 
                     isCompressing = false;
                     btnCompress.textContent = '🔄 重新压缩';
